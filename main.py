@@ -5,6 +5,17 @@ import smtplib
 import config
 import re
 import numpy as np
+import pathlib
+
+
+def main():
+    file = pathlib.Path('current-prices.csv')
+    if not file.exists():
+        write_data()
+    else:
+        compare_prices()
+        send_email()
+        write_data()
 
 
 def is_valid_url(str):
@@ -145,7 +156,5 @@ def write_data():
 
 
 if __name__ == '__main__':
-    # if current-prices is not --> write_data() --> else ---> continue
-    compare_prices()
-    send_email()
-    write_data()
+    main()
+
