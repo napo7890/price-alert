@@ -145,7 +145,7 @@ def write_data():
 
 
 if __name__ == '__main__':
-    # write_data()
+    # if current-prices is not --> write_data() --> else ---> continue
     compare_prices()
     send_email()
     write_data()
