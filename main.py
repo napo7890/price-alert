@@ -151,13 +151,3 @@ if __name__ == '__main__':
     write_data()
 
 
-'''
-Phase 2 plan:
-Build a cloud crawler with ScreamingFrog in Google Cloud:
-
-1. give the specific pages on top10.com where prices needs to be updated.
-2. competitors' content research - analyze content (i.e. keywords in H2, top repeated keywords) with AI, Deep Learning (PyTorch, TensorFlow bu Google)
- - discover hidden content oportinities.
-3. Emails via ec2, ecs amazon service
-* Automate url list to only 200, from a crawl, or internal API (Daniel Giterman)
-'''
