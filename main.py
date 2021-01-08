@@ -138,7 +138,7 @@ def send_email():
             msg
         ])
 
-        server.starttls()  # security function to connect to the Gmail server (protects the email password)
+        server.starttls()
         server.login(email_from, password)
         server.sendmail(email_from, [email_to], message)
         print('Email alert sent')
