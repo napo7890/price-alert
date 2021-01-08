@@ -9,7 +9,7 @@ import pathlib
 
 
 def main():
-    file = pathlib.Path('current-prices.csv')
+    file = pathlib.Path(config.PRICES_File_PATH)
     if not file.exists():
         write_data()
     else:
@@ -40,10 +40,10 @@ def is_valid_url(str):
         return False
 
 
-def get_partners_from_file():
+def get_urls_from_file():
     url_list = []
-    partners_file_path = config.URL_SOURCE_FILE
-    df_urls = pd.read_csv(partners_file_path, header=None)
+    urls_file_path = config.URL_SOURCE_FILE
+    df_urls = pd.read_csv(urls_file_path, header=None)
 
     # validate that url is valid
     for url in df_urls.values:
@@ -52,17 +52,16 @@ def get_partners_from_file():
     return url_list
 
 
-def get_parsed_prices():
-    partners_list = get_partners_from_file()
+def get_scraped_prices():
+    urls_list = get_urls_from_file()
     headers = config.USER_AGENT
-    parsed_prices_dict = {}
-    for url in partners_list:
-        parsed_prices = []
+    scraped_prices_dict = {}
+    for url in urls_list:
+        scraped_prices = []
         page = requests.get(url[0], headers=headers)
         soup = BeautifulSoup(page.content, 'html.parser')
 
-        price = soup.find_all(['class', 'h1', 'h2', 'span', 'div', 'a', 'title', 'del', 'a', 'p'],
-                              text=re.compile(r'\$'))
+        price = soup.find_all(['class', 'h1', 'h2', 'span', 'div', 'a', 'title', 'del', 'a', 'p'], text=re.compile(r'\$'))
 
         dollars = []
         for x in re.findall('(\$[0-9]+(\.[0-9]+)?)', str(price)):
@@ -75,43 +74,43 @@ def get_parsed_prices():
 
         for price in price_digit_unique:
             price = float(price)
-            parsed_prices.append(price)
+            scraped_prices.append(price)
 
-        parsed_prices.sort()
-        parsed_prices_dict.update({str(url): parsed_prices})
+        scraped_prices.sort()
+        scraped_prices_dict.update({str(url): scraped_prices})
 
-    return parsed_prices_dict
+    return scraped_prices_dict
 
 
 def compare_prices():
-    # Get current prices from file
+    # Get saved prices from file
     prices_file_path = config.PRICES_File_PATH
-    df_current_prices = pd.read_csv(prices_file_path)  # header=1
+    df_saved_prices = pd.read_csv(prices_file_path)  # header=1
 
-    # Get parsed prices
-    prices_values = list(get_parsed_prices().values())
-    price_keys = list(get_parsed_prices().keys())
-    df_parsed_prices = pd.DataFrame.from_dict(prices_values).transpose().fillna(0).reset_index(drop=True)
-    df_parsed_prices.columns = price_keys
+    # Get scraped prices
+    prices_values = list(get_scraped_prices().values())
+    price_keys = list(get_scraped_prices().keys())
+    df_scraped_prices = pd.DataFrame.from_dict(prices_values).transpose().fillna(0).reset_index(drop=True)
+    df_scraped_prices.columns = price_keys
 
-    # Compare current prices to parsed prices
-    ne_stacked = (df_current_prices != df_parsed_prices).stack()
+    # Compare saved prices to scraped prices
+    ne_stacked = (df_saved_prices != df_scraped_prices).stack()
     for change in ne_stacked:
         if change:
             changed = ne_stacked[ne_stacked]
-            changed.index.names = ['ID', 'Partner']
-            difference_locations = np.where(df_current_prices != df_parsed_prices)
-            changed_from = df_current_prices.values[difference_locations]
-            changed_to = df_parsed_prices.values[difference_locations]
+            changed.index.names = ['ID', 'URL']
+            difference_locations = np.where(df_saved_prices != df_scraped_prices)
+            changed_from = df_saved_prices.values[difference_locations]
+            changed_to = df_scraped_prices.values[difference_locations]
 
-            df_price_changes = pd.DataFrame({'Current Price': changed_from, 'Parsed Price': changed_to}, index=changed.index)
+            df_price_changes = pd.DataFrame({'Saved Price': changed_from, 'Scraped Price': changed_to}, index=changed.index)
             df_price_changes.to_csv('price-changes.csv', index=False, header=True, mode='w')
 
             alerts = []
             for row in df_price_changes.itertuples(df_price_changes.index.names):
-                partner = row[0][1]
+                url = row[0][1]
                 prices = row[1:]
-                msg = f'A price value on page {partner} has been changed from ${prices[0]} to ${prices[1]}'
+                msg = f'A price value on page {url} has been changed from ${prices[0]} to ${prices[1]}'
                 alerts.append(msg)
             return alerts
 
@@ -122,14 +121,14 @@ def send_email():
         # Send email
         print('Sending email...')
 
-        # Settings email
+        # Get Email Settings
         email_from = config.EMAIL_FROM
         email_to = config.EMAIL_TO
         password = config.EMAIL_PASSWORD
         server = smtplib.SMTP(config.EMAIL_SERVER, config.EMAIL_PORT)
 
         # Create message
-        msg = 'Hi Content team! \n\n' 'You are receiving this alert because the price for some of our partners has been changed.' \
+        msg = 'Hi Content team! \n\n' 'You are receiving this alert because the price for some of our competitors has been changed.' \
               '\n\n' 'See the summary below.\n\n' + str(alerts).strip('[]').replace(', ', '\n\n').replace('"', '')
 
         message = '\r\n'.join([
@@ -145,14 +144,17 @@ def send_email():
         print('Email alert sent')
         server.quit()
 
+    else:
+        print('No price changes were found')
+
 
 def write_data():
-    price_keys = get_parsed_prices().keys()
-    price_values = get_parsed_prices().values()
+    price_keys = get_scraped_prices().keys()
+    price_values = get_scraped_prices().values()
 
-    df_current_prices = pd.DataFrame.from_dict(price_values).transpose().fillna(0).reset_index(drop=True)
-    df_current_prices.columns = price_keys
-    df_current_prices.to_csv('current-prices.csv', index=False, header=True, mode='w')
+    df_saved_prices = pd.DataFrame.from_dict(price_values).transpose().fillna(0).reset_index(drop=True)
+    df_saved_prices.columns = price_keys
+    df_saved_prices.to_csv('saved-prices.csv', index=False, header=True, mode='w')
 
 
 if __name__ == '__main__':
